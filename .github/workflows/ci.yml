@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─── Job 1: SwiftLint ───────────────────────────────────────────────────────
+  lint:
+    name: SwiftLint
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Homebrew packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/Homebrew
+            /usr/local/Cellar/swiftlint
+          key: ${{ runner.os }}-brew-swiftlint-${{ hashFiles('.swiftlint.yml') }}
+          restore-keys: ${{ runner.os }}-brew-swiftlint-
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Run SwiftLint
+        run: swiftlint lint --strict --config .swiftlint.yml
+
+  # ─── Job 2: Build & Test ────────────────────────────────────────────────────
+  build-and-test:
+    name: Build & Test (iOS)
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+
+      - name: Show build environment
+        run: |
+          xcodebuild -version
+          xcrun simctl list devicetypes | grep "iPhone 16"
+
+      - name: Cache DerivedData
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData
+          key: ${{ runner.os }}-derived-${{ hashFiles('Imli.xcodeproj/project.pbxproj') }}
+          restore-keys: ${{ runner.os }}-derived-
+
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Imli.xcodeproj \
+            -scheme Imli \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            clean build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            ONLY_ACTIVE_ARCH=NO
+
+      - name: Test
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Imli.xcodeproj \
+            -scheme Imli \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            test \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            -resultBundlePath TestResults.xcresult
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ github.run_number }}
+          path: TestResults.xcresult
+          retention-days: 7

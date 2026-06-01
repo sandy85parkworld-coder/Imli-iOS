@@ -1,0 +1,56 @@
+included:
+  - Imli
+  - ImliTests
+
+excluded:
+  - Imli/Assets.xcassets
+
+disabled_rules:
+  - trailing_whitespace    # noisy in Xcode auto-format
+  - todo                   # allow TODO comments during development
+
+opt_in_rules:
+  - array_init
+  - closure_spacing
+  - collection_alignment
+  - explicit_init
+  - force_unwrapping
+  - modifier_order
+  - sorted_imports
+  - vertical_whitespace_closing_braces
+
+# Thresholds tuned for this project's existing file sizes
+line_length:
+  warning: 130
+  error: 160
+  ignores_urls: true
+  ignores_comments: true
+
+type_body_length:
+  warning: 350
+  error: 500
+
+file_length:
+  warning: 450
+  error: 600
+
+function_body_length:
+  warning: 60
+  error: 100
+
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+
+identifier_name:
+  min_length: 2
+  excluded:
+    - id
+    - vm
+    - a
+    - b
+    - c
+    - d
+    - e
+    - r
+    - g

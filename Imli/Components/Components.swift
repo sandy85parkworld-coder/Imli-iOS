@@ -238,7 +238,7 @@ struct FSSAIBadge: View {
             Image(systemName: "checkmark.seal.fill")
                 .font(.system(size: 10))
                 .foregroundColor(Color(hex: "#1565C0"))
-            Text("Database Verified")
+            Text("FSSAI Verified")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundColor(Color(hex: "#1565C0"))
         }

@@ -48,6 +48,35 @@ private struct OFFNutriments: Decodable {
     }
 }
 
+// MARK: - Search result (lightweight, for list display)
+
+struct ProductSearchResult: Identifiable {
+    let id: String        // barcode
+    let name: String
+    let brand: String
+    let category: String
+    let emoji: String
+}
+
+// MARK: - Search API response
+
+private struct OFFSearchResponse: Decodable {
+    let products: [OFFSearchProduct]
+}
+
+private struct OFFSearchProduct: Decodable {
+    let code: String?
+    let productName: String?
+    let brands: String?
+    let categories: String?
+
+    enum CodingKeys: String, CodingKey {
+        case code
+        case productName = "product_name"
+        case brands, categories
+    }
+}
+
 // MARK: - Service
 
 final class ProductAPIService {
@@ -55,6 +84,42 @@ final class ProductAPIService {
     private init() {}
 
     private let baseURL = "https://world.openfoodfacts.org/api/v3/product"
+    private let searchURL = "https://world.openfoodfacts.org/cgi/search.pl"
+
+    func searchProducts(query: String) async throws -> [ProductSearchResult] {
+        guard !query.isEmpty,
+              var components = URLComponents(string: searchURL) else { return [] }
+
+        components.queryItems = [
+            URLQueryItem(name: "search_terms",  value: query),
+            URLQueryItem(name: "action",        value: "process"),
+            URLQueryItem(name: "json",          value: "1"),
+            URLQueryItem(name: "page_size",     value: "15"),
+            URLQueryItem(name: "fields",        value: "code,product_name,brands,categories")
+        ]
+
+        guard let url = components.url else { return [] }
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
+        request.setValue("ImliApp/1.0", forHTTPHeaderField: "User-Agent")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { return [] }
+
+        let decoded = try JSONDecoder().decode(OFFSearchResponse.self, from: data)
+        return decoded.products.compactMap { p -> ProductSearchResult? in
+            guard let barcode = p.code, !barcode.isEmpty,
+                  let name = p.productName, !name.isEmpty else { return nil }
+            let brand    = p.brands?.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? ""
+            let category = p.categories?.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? ""
+            return ProductSearchResult(
+                id:       barcode,
+                name:     name.trimmingCharacters(in: .whitespaces),
+                brand:    brand,
+                category: category,
+                emoji:    emojiForCategory(category)
+            )
+        }
+    }
 
     func fetchProduct(barcode: String) async throws -> Product? {
         guard let url = URL(string: "\(baseURL)/\(barcode)") else { return nil }

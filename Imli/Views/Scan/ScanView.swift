@@ -7,6 +7,12 @@ struct ScanView: View {
     @State private var selectedMode: ScanMode = .barcode
     @State private var showingResult = false
     @State private var cameraPermission: CameraPermission = .unknown
+    // Search state
+    @State private var searchQuery = ""
+    @State private var searchResults: [ProductSearchResult] = []
+    @State private var isSearching = false
+    @State private var searchDebounce: Task<Void, Never>?
+    @FocusState private var searchFocused: Bool
 
     let onProductScanned: (Product) -> Void
 
@@ -211,57 +217,139 @@ struct ScanView: View {
 
     // MARK: - Search layer
     private var searchLayer: some View {
-        VStack(spacing: 20) {
-            Spacer()
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.white.opacity(0.5))
-                Text("Search product name or brand...")
-                    .foregroundColor(.white.opacity(0.4))
-                    .font(ImliFont.callout())
-                Spacer()
-            }
-            .padding(14)
-            .background(Color.white.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: ImliRadius.lg))
-            .padding(.horizontal, 20)
+        VStack(spacing: 0) {
+            // Search field
+            HStack(spacing: 10) {
+                Image(systemName: isSearching ? "arrow.clockwise" : "magnifyingglass")
+                    .font(.system(size: 15))
+                    .foregroundColor(.white.opacity(0.6))
+                    .rotationEffect(isSearching ? .degrees(360) : .zero)
+                    .animation(isSearching ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isSearching)
 
-            // Demo quick search buttons
-            VStack(spacing: 10) {
-                ForEach(["Oreo Original", "Coca-Cola 330ml", "Lay's Classic"], id: \.self) { name in
-                    Button {
-                        Task {
-                            let uid = authService.userId
-                            switch name {
-                            case "Oreo Original":   await viewModel.lookupBarcode("7622300489991", userId: uid)
-                            case "Coca-Cola 330ml": await viewModel.lookupBarcode("5449000000996", userId: uid)
-                            default:                await viewModel.lookupBarcode("0028400090513", userId: uid)
-                            }
+                TextField("", text: $searchQuery, prompt: Text("Search product name or brand…").foregroundColor(.white.opacity(0.4)))
+                    .foregroundColor(.white)
+                    .font(ImliFont.callout())
+                    .focused($searchFocused)
+                    .autocorrectionDisabled()
+                    .submitLabel(.search)
+                    .onSubmit { triggerSearch() }
+                    .onChange(of: searchQuery) { _, query in
+                        searchDebounce?.cancel()
+                        if query.trimmingCharacters(in: .whitespaces).count < 2 {
+                            searchResults = []
+                            return
                         }
-                    } label: {
-                        HStack {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 13))
-                                .foregroundColor(.white.opacity(0.5))
-                            Text(name)
-                                .font(ImliFont.callout())
-                                .foregroundColor(.white.opacity(0.8))
-                            Spacer()
-                            Image(systemName: "arrow.up.left")
-                                .font(.system(size: 12))
-                                .foregroundColor(.white.opacity(0.4))
+                        searchDebounce = Task {
+                            try? await Task.sleep(nanoseconds: 400_000_000)
+                            guard !Task.isCancelled else { return }
+                            triggerSearch()
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
-                        .background(Color.white.opacity(0.07))
-                        .clipShape(RoundedRectangle(cornerRadius: ImliRadius.md))
                     }
-                    .padding(.horizontal, 20)
+
+                if !searchQuery.isEmpty {
+                    Button {
+                        searchQuery = ""
+                        searchResults = []
+                        searchFocused = true
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.white.opacity(0.4))
+                    }
                 }
             }
-            Spacer()
+            .padding(14)
+            .background(Color.white.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: ImliRadius.lg))
+            .padding(.horizontal, 20)
+            .padding(.top, 24)
+            .onAppear { searchFocused = true }
+
+            // Results
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    if searchResults.isEmpty && !isSearching && searchQuery.count >= 2 {
+                        noResultsView
+                    } else {
+                        ForEach(searchResults) { result in
+                            searchResultRow(result)
+                                .padding(.horizontal, 20)
+                            Divider()
+                                .background(Color.white.opacity(0.08))
+                                .padding(.leading, 72)
+                        }
+                    }
+                }
+                .padding(.top, 8)
+            }
+
             Spacer()
         }
+    }
+
+    private func searchResultRow(_ result: ProductSearchResult) -> some View {
+        Button {
+            searchFocused = false
+            Task { await viewModel.lookupBarcode(result.id, userId: authService.userId) }
+        } label: {
+            HStack(spacing: 12) {
+                Text(result.emoji)
+                    .font(.system(size: 22))
+                    .frame(width: 44, height: 44)
+                    .background(Color.white.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: ImliRadius.sm))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(result.name)
+                        .font(ImliFont.subheadline())
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                    if !result.brand.isEmpty {
+                        Text(result.brand)
+                            .font(ImliFont.caption1())
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "arrow.up.left")
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.3))
+            }
+            .padding(.vertical, 12)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var noResultsView: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 32))
+                .foregroundColor(.white.opacity(0.2))
+            Text("No products found for "\(searchQuery)"")
+                .font(ImliFont.footnote())
+                .foregroundColor(.white.opacity(0.4))
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 48)
+    }
+
+    private func triggerSearch() {
+        let query = searchQuery.trimmingCharacters(in: .whitespaces)
+        guard query.count >= 2 else { return }
+        isSearching = true
+        Task {
+            do {
+                let results = try await ProductAPIService.shared.searchProducts(query: query)
+                searchResults = results
+            } catch {
+                searchResults = []
+            }
+            isSearching = false
+        }
+    }
     }
 
     // MARK: - Bottom Controls

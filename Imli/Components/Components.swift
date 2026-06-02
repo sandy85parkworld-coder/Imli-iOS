@@ -231,14 +231,14 @@ struct KidSafetyBanner: View {
     }
 }
 
-// MARK: - FSSAI Badge
+// MARK: - Verified Badge
 struct FSSAIBadge: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "checkmark.seal.fill")
                 .font(.system(size: 10))
                 .foregroundColor(Color(hex: "#1565C0"))
-            Text("FSSAI Verified")
+            Text("Database Verified")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundColor(Color(hex: "#1565C0"))
         }

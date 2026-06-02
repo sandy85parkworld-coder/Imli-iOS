@@ -172,7 +172,7 @@ final class ProductAPIService {
         if n.transFat > 0.2 {
             flags.append(.init(name: "Trans Fat Detected", detail: "Contains \(String(format: "%.1f", n.transFat))g trans fat per 100g. Linked to heart disease.", severity: .danger, badge: "Trans Fat"))
         } else if lower.contains("vanaspati") || lower.contains("hydrogenated") {
-            flags.append(.init(name: "Partially Hydrogenated Oil", detail: "May contain trans fats (vanaspati). Avoid for children.", severity: .danger, badge: "Vanaspati"))
+            flags.append(.init(name: "Partially Hydrogenated Oil", detail: "May contain trans fats. Linked to heart disease — avoid for children.", severity: .danger, badge: "Trans Fat Risk"))
         }
 
         // High sugar

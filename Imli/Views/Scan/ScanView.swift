@@ -228,14 +228,14 @@ struct ScanView: View {
 
             // Demo quick search buttons
             VStack(spacing: 10) {
-                ForEach(["Bourbon Biscuits", "Aashirvaad Atta", "Maggi Chicken"], id: \.self) { name in
+                ForEach(["Oreo Original", "Coca-Cola 330ml", "Lay's Classic"], id: \.self) { name in
                     Button {
                         Task {
                             let uid = authService.userId
                             switch name {
-                            case "Bourbon Biscuits": await viewModel.lookupBarcode("8901063025059", userId: uid)
-                            case "Aashirvaad Atta":  await viewModel.lookupBarcode("8901030832109", userId: uid)
-                            default:                 await viewModel.lookupBarcode("8901058005016", userId: uid)
+                            case "Oreo Original":   await viewModel.lookupBarcode("7622300489991", userId: uid)
+                            case "Coca-Cola 330ml": await viewModel.lookupBarcode("5449000000996", userId: uid)
+                            default:                await viewModel.lookupBarcode("0028400090513", userId: uid)
                             }
                         }
                     } label: {

@@ -61,7 +61,7 @@ struct ProfileView: View {
                             Text("Imli — Food Safety Scanner")
                                 .font(ImliFont.caption1())
                                 .foregroundColor(.imliSecondary)
-                            Text("Version 1.0.0 · Data from FSSAI & ICMR")
+                            Text("Version 1.0.0 · Powered by Open Food Facts")
                                 .font(ImliFont.caption2())
                                 .foregroundColor(.imliSecondary.opacity(0.7))
                         }

@@ -19,8 +19,8 @@ struct OnboardingView: View {
         ),
         OnboardingPage(
             emoji: "⚠️",
-            title: "India-Specific Alerts",
-            description: "Flags vanaspati, palm oil, banned artificial colours, and harmful preservatives that affect Indian consumers most.",
+            title: "Smart Ingredient Alerts",
+            description: "Instantly flags trans fats, palm oil, artificial colours, harmful preservatives, and additives — so you always know what you're eating.",
             accent: Color(hex: "#E65100")
         ),
         OnboardingPage(

@@ -221,6 +221,7 @@ struct FamilyMember: Identifiable, Codable {
     var name: String
     var ageGroup: AgeGroup
     var emoji: String
+    var dietPreferences: Set<UserProfile.DietPreference>
 
     enum AgeGroup: String, CaseIterable, Codable {
         case toddler  = "Toddler (0–2 yrs)"
@@ -230,8 +231,133 @@ struct FamilyMember: Identifiable, Codable {
         case senior   = "Senior (60+ yrs)"
     }
 
-    init(id: UUID = UUID(), name: String, ageGroup: AgeGroup, emoji: String) {
-        self.id = id; self.name = name; self.ageGroup = ageGroup; self.emoji = emoji
+    init(id: UUID = UUID(), name: String, ageGroup: AgeGroup, emoji: String,
+         dietPreferences: Set<UserProfile.DietPreference> = []) {
+        self.id = id; self.name = name; self.ageGroup = ageGroup
+        self.emoji = emoji; self.dietPreferences = dietPreferences
+    }
+
+    // Custom decoder so old Firestore docs without dietPreferences still load.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id       = try c.decode(UUID.self,     forKey: .id)
+        name     = try c.decode(String.self,   forKey: .name)
+        ageGroup = try c.decode(AgeGroup.self, forKey: .ageGroup)
+        emoji    = try c.decode(String.self,   forKey: .emoji)
+        let prefArray = try c.decodeIfPresent([UserProfile.DietPreference].self,
+                                              forKey: .dietPreferences) ?? []
+        dietPreferences = Set(prefArray)
+    }
+}
+
+// MARK: - Member Safety Result
+
+struct MemberSafetyResult: Identifiable {
+    var id: UUID { member.id }
+    let member: FamilyMember
+    let verdict: Verdict
+    let concerns: [String]
+
+    enum Verdict: Int {
+        case safe = 0, caution = 1, avoid = 2
+
+        var label: String {
+            switch self { case .safe: "Safe"; case .caution: "Caution"; case .avoid: "Avoid" }
+        }
+        var icon: String {
+            switch self {
+            case .safe:    "checkmark.circle.fill"
+            case .caution: "exclamationmark.circle.fill"
+            case .avoid:   "xmark.circle.fill"
+            }
+        }
+        var color: Color {
+            switch self {
+            case .safe:    Color(hex: "#2E7D32")
+            case .caution: Color(hex: "#E65100")
+            case .avoid:   Color(hex: "#C62828")
+            }
+        }
+        var backgroundColor: Color {
+            switch self {
+            case .safe:    Color(hex: "#E8F5E9")
+            case .caution: Color(hex: "#FFF3E0")
+            case .avoid:   Color(hex: "#FFEBEE")
+            }
+        }
+    }
+}
+
+// MARK: - Product family analysis
+extension Product {
+    func analyze(for member: FamilyMember) -> MemberSafetyResult {
+        var concerns: [String] = []
+        var worst = MemberSafetyResult.Verdict.safe
+
+        func flag(_ reason: String, _ v: MemberSafetyResult.Verdict) {
+            concerns.append(reason)
+            if v.rawValue > worst.rawValue { worst = v }
+        }
+
+        // Age-group checks
+        switch member.ageGroup {
+        case .toddler, .child:
+            if !kidSafe {
+                flag("Not recommended for \(member.ageGroup == .toddler ? "toddlers" : "children")", .avoid)
+            }
+            if flags.contains(where: { $0.name.contains("MSG") }) {
+                flag("Contains MSG — avoid for young children", .avoid)
+            }
+            if flags.contains(where: { $0.name.lowercased().contains("colour") || $0.name.lowercased().contains("color") }) {
+                flag("Contains artificial colours", .caution)
+            }
+            if nutrition.transFat > 0.1 {
+                flag("Trans fat detected (\(String(format: "%.1f", nutrition.transFat))g)", .avoid)
+            }
+        case .senior:
+            if nutrition.sodium > 600 {
+                flag("Very high sodium (\(Int(nutrition.sodium))mg) — monitor for seniors", .caution)
+            }
+        default: break
+        }
+
+        // Diet preference checks
+        for pref in member.dietPreferences {
+            switch pref {
+            case .pureVeg, .vegan, .jain:
+                if vegStatus == .nonVeg {
+                    flag("Contains non-vegetarian ingredients", .avoid)
+                }
+            case .noPalmOil:
+                if flags.contains(where: { $0.name.lowercased().contains("palm") }) {
+                    flag("Contains palm oil", .caution)
+                }
+            case .lowSugar:
+                if nutrition.totalSugars > 15 {
+                    flag("High sugar (\(Int(nutrition.totalSugars))g/100g)", .caution)
+                }
+            case .diabetic:
+                if nutrition.totalSugars > 10 {
+                    flag("High sugar for diabetics (\(Int(nutrition.totalSugars))g/100g)", .avoid)
+                }
+            case .glutenFree:
+                let lower = ingredients.lowercased()
+                if ["wheat", "gluten", "barley", "rye"].contains(where: { lower.contains($0) }) {
+                    flag("Contains gluten", .avoid)
+                }
+            }
+        }
+
+        // Grade-based fallback when no specific concern triggered
+        if concerns.isEmpty {
+            switch grade {
+            case .d: flag("Overall safety grade is Poor", .caution)
+            case .e: flag("Overall safety grade is Avoid", .avoid)
+            default: break
+            }
+        }
+
+        return MemberSafetyResult(member: member, verdict: worst, concerns: concerns)
     }
 }
 

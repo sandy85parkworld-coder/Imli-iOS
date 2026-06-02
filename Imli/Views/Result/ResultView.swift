@@ -5,6 +5,7 @@ struct ResultView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var savedVM: SavedViewModel
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var profileVM: ProfileViewModel
     @State private var selectedTab: ResultTab = .safety
 
     enum ResultTab: String, CaseIterable {
@@ -12,6 +13,11 @@ struct ResultView: View {
         case nutrition = "Nutrition"
         case ingredients = "Ingredients"
         case alternatives = "Alternatives"
+        case family = "Family"
+    }
+
+    private var familyResults: [MemberSafetyResult] {
+        profileVM.profile.familyMembers.map { product.analyze(for: $0) }
     }
 
     var body: some View {
@@ -152,10 +158,11 @@ struct ResultView: View {
     @ViewBuilder
     private var tabContent: some View {
         switch selectedTab {
-        case .safety:     safetyTab
-        case .nutrition:  nutritionTab
-        case .ingredients: ingredientsTab
+        case .safety:       safetyTab
+        case .nutrition:    nutritionTab
+        case .ingredients:  ingredientsTab
         case .alternatives: alternativesTab
+        case .family:       familyTab
         }
     }
 
@@ -254,6 +261,102 @@ struct ResultView: View {
                 .padding(16)
             }
         }
+    }
+
+    // MARK: - Family Tab
+    private var familyTab: some View {
+        VStack(spacing: 0) {
+            if familyResults.isEmpty {
+                VStack(spacing: 14) {
+                    Image(systemName: "person.3")
+                        .font(.system(size: 40))
+                        .foregroundColor(.imliSecondary.opacity(0.4))
+                    Text("No family members added")
+                        .font(ImliFont.subheadline())
+                        .foregroundColor(.imliSecondary)
+                    Text("Go to Profile → Family Members to add your family.")
+                        .font(ImliFont.caption1())
+                        .foregroundColor(.imliSecondary.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 48)
+            } else {
+                SectionHeader(title: "Safety for Each Member")
+                VStack(spacing: 10) {
+                    ForEach(familyResults) { result in
+                        familyMemberCard(result)
+                    }
+                }
+                .padding(.top, 4)
+            }
+        }
+    }
+
+    private func familyMemberCard(_ result: MemberSafetyResult) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Member header row
+            HStack(spacing: 12) {
+                Text(result.member.emoji)
+                    .font(.system(size: 26))
+                    .frame(width: 44, height: 44)
+                    .background(result.verdict.backgroundColor)
+                    .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(result.member.name)
+                        .font(ImliFont.subheadline())
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    Text(result.member.ageGroup.rawValue)
+                        .font(ImliFont.caption1())
+                        .foregroundColor(.imliSecondary)
+                }
+
+                Spacer()
+
+                HStack(spacing: 5) {
+                    Image(systemName: result.verdict.icon)
+                        .font(.system(size: 14))
+                    Text(result.verdict.label)
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundColor(result.verdict.color)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(result.verdict.backgroundColor)
+                .clipShape(Capsule())
+            }
+            .padding(14)
+
+            // Concerns list
+            if !result.concerns.isEmpty {
+                Divider().padding(.leading, 70)
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(result.concerns, id: \.self) { concern in
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: result.verdict == .caution ? "exclamationmark.circle" : "xmark.circle")
+                                .font(.system(size: 12))
+                                .foregroundColor(result.verdict.color)
+                                .padding(.top, 1)
+                            Text(concern)
+                                .font(ImliFont.caption1())
+                                .foregroundColor(.primary.opacity(0.8))
+                        }
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .padding(.leading, 56)
+            }
+        }
+        .background(Color.imliCard)
+        .clipShape(RoundedRectangle(cornerRadius: ImliRadius.lg))
+        .overlay(
+            RoundedRectangle(cornerRadius: ImliRadius.lg)
+                .strokeBorder(result.verdict.color.opacity(0.3), lineWidth: 1)
+        )
     }
 
     // MARK: - Alternatives Tab

@@ -368,6 +368,7 @@ struct AddFamilyMemberSheet: View {
     @State private var name: String
     @State private var ageGroup: FamilyMember.AgeGroup
     @State private var selectedEmoji: String
+    @State private var dietPreferences: Set<UserProfile.DietPreference>
 
     let isEditing: Bool
     let onSave: (FamilyMember) -> Void
@@ -381,11 +382,12 @@ struct AddFamilyMemberSheet: View {
     ]
 
     init(editing member: FamilyMember? = nil, onSave: @escaping (FamilyMember) -> Void) {
-        _name       = State(initialValue: member?.name ?? "")
-        _ageGroup   = State(initialValue: member?.ageGroup ?? .adult)
-        _selectedEmoji = State(initialValue: member?.emoji ?? "👨")
-        isEditing   = member != nil
-        self.onSave = onSave
+        _name            = State(initialValue: member?.name ?? "")
+        _ageGroup        = State(initialValue: member?.ageGroup ?? .adult)
+        _selectedEmoji   = State(initialValue: member?.emoji ?? "👨")
+        _dietPreferences = State(initialValue: member?.dietPreferences ?? [])
+        isEditing        = member != nil
+        self.onSave      = onSave
     }
 
     var body: some View {
@@ -428,6 +430,45 @@ struct AddFamilyMemberSheet: View {
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                 }
+
+                Section {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                        ForEach(UserProfile.DietPreference.allCases, id: \.self) { pref in
+                            let isActive = dietPreferences.contains(pref)
+                            Button {
+                                if isActive { dietPreferences.remove(pref) }
+                                else        { dietPreferences.insert(pref) }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(isActive ? .imliGreen : .imliSecondary)
+                                    Text(pref.rawValue)
+                                        .font(.system(size: 12, weight: isActive ? .semibold : .regular))
+                                        .foregroundColor(isActive ? .imliGreen : .imliSecondary)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.8)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 9)
+                                .background(isActive ? Color.imliGreenLight : Color.imliSurface)
+                                .clipShape(RoundedRectangle(cornerRadius: ImliRadius.md))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: ImliRadius.md)
+                                        .strokeBorder(isActive ? Color.imliGreenMid : Color.imliSeparator, lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                } header: {
+                    Text("Diet Preferences")
+                } footer: {
+                    Text("Used to analyse scan results specifically for this member.")
+                }
             }
             .navigationTitle(isEditing ? "Edit Member" : "Add Family Member")
             .navigationBarTitleDisplayMode(.inline)
@@ -439,9 +480,10 @@ struct AddFamilyMemberSheet: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(isEditing ? "Update" : "Add") {
                         let member = FamilyMember(
-                            name:     name.trimmingCharacters(in: .whitespaces),
-                            ageGroup: ageGroup,
-                            emoji:    selectedEmoji
+                            name:             name.trimmingCharacters(in: .whitespaces),
+                            ageGroup:         ageGroup,
+                            emoji:            selectedEmoji,
+                            dietPreferences:  dietPreferences
                         )
                         onSave(member)
                         dismiss()

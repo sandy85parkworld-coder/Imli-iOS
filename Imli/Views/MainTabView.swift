@@ -27,6 +27,7 @@ struct MainTabView: View {
         }
         .tint(.imliGreen)
         .environmentObject(savedVM)
+        .environmentObject(profileVM)
         .task(id: authService.userId) {
             guard let uid = authService.userId else { return }
             async let h: () = historyVM.loadHistory(userId: uid)

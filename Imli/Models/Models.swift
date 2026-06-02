@@ -336,6 +336,14 @@ extension Product {
 }
 
 extension UserProfile {
+    static let empty = UserProfile(
+        name: "",
+        dietPreferences: [],
+        familyMembers: [],
+        totalScans: 0,
+        safePercentage: 0
+    )
+
     static let mock = UserProfile(
         name: "Ramesh Kumar",
         dietPreferences: [.pureVeg, .noPalmOil, .lowSugar],

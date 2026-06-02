@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProfileView: View {
     @ObservedObject var viewModel: ProfileViewModel
+    @EnvironmentObject var authService: AuthService
 
     var body: some View {
         NavigationStack {
@@ -32,6 +33,22 @@ struct ProfileView: View {
                     settingsRow(icon: "globe", label: "Language", color: .blue, detail: "English")
                     settingsRow(icon: "lock.shield", label: "Privacy", color: .imliGreen)
                     settingsRow(icon: "questionmark.circle", label: "Help & FAQ", color: .orange)
+                    Button(role: .destructive) {
+                        authService.signOut()
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                                .font(.system(size: 14))
+                                .foregroundColor(.white)
+                                .frame(width: 30, height: 30)
+                                .background(Color.imliRed)
+                                .clipShape(RoundedRectangle(cornerRadius: 7))
+                            Text("Sign Out")
+                                .font(ImliFont.callout())
+                                .foregroundColor(.imliRed)
+                            Spacer()
+                        }
+                    }
                 } header: {
                     Text("Settings")
                 }
@@ -128,7 +145,9 @@ struct ProfileView: View {
             ForEach(UserProfile.DietPreference.allCases, id: \.self) { pref in
                 let isActive = viewModel.profile.dietPreferences.contains(pref)
                 Button {
-                    viewModel.togglePreference(pref)
+                    if let uid = authService.userId {
+                        viewModel.togglePreference(pref, userId: uid)
+                    }
                 } label: {
                     Text(pref.rawValue)
                         .font(.system(size: 13, weight: isActive ? .semibold : .regular))

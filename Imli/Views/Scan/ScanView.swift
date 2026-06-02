@@ -3,6 +3,7 @@ import AVFoundation
 
 struct ScanView: View {
     @StateObject private var viewModel = ScanViewModel()
+    @EnvironmentObject var authService: AuthService
     @State private var selectedMode: ScanMode = .barcode
     @State private var showingResult = false
     @State private var cameraPermission: CameraPermission = .unknown
@@ -43,8 +44,21 @@ struct ScanView: View {
             .sheet(isPresented: $showingResult) {
                 if let product = viewModel.product {
                     ResultView(product: product)
-                        .onDisappear { viewModel.reset() }
+                        .onDisappear {
+                            onProductScanned(product)
+                            viewModel.reset()
+                        }
                 }
+            }
+            .alert("Product Not Found", isPresented: .constant(viewModel.scanState == .notFound)) {
+                Button("OK") { viewModel.reset() }
+            } message: {
+                Text("No product found for barcode \(viewModel.scannedBarcode ?? ""). Try scanning again or search manually.")
+            }
+            .alert("Error", isPresented: .constant(viewModel.scanState == .error)) {
+                Button("OK") { viewModel.reset() }
+            } message: {
+                Text(viewModel.errorMessage ?? "Something went wrong. Check your connection.")
             }
             .onChange(of: viewModel.scanState) { _, state in
                 if state == .success { showingResult = true }
@@ -81,7 +95,7 @@ struct ScanView: View {
             // Live camera
             BarcodeScannerView(
                 onBarcodeFound: { barcode in
-                    Task { await viewModel.lookupBarcode(barcode) }
+                    Task { await viewModel.lookupBarcode(barcode, userId: authService.userId) }
                 },
                 torchOn: $viewModel.torchOn
             )
@@ -217,10 +231,11 @@ struct ScanView: View {
                 ForEach(["Bourbon Biscuits", "Aashirvaad Atta", "Maggi Chicken"], id: \.self) { name in
                     Button {
                         Task {
+                            let uid = authService.userId
                             switch name {
-                            case "Bourbon Biscuits": await viewModel.lookupBarcode("8901063025059")
-                            case "Aashirvaad Atta": await viewModel.lookupBarcode("8901030832109")
-                            default: await viewModel.lookupBarcode("8901058005016")
+                            case "Bourbon Biscuits": await viewModel.lookupBarcode("8901063025059", userId: uid)
+                            case "Aashirvaad Atta":  await viewModel.lookupBarcode("8901030832109", userId: uid)
+                            default:                 await viewModel.lookupBarcode("8901058005016", userId: uid)
                             }
                         }
                     } label: {

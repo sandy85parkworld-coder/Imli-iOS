@@ -3,6 +3,8 @@ import SwiftUI
 struct ResultView: View {
     let product: Product
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var savedVM: SavedViewModel
+    @EnvironmentObject var authService: AuthService
     @State private var selectedTab: ResultTab = .safety
 
     enum ResultTab: String, CaseIterable {
@@ -39,11 +41,21 @@ struct ResultView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        // Share action
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                            .foregroundColor(.imliBlue)
+                    HStack(spacing: 4) {
+                        Button {
+                            guard let uid = authService.userId else { return }
+                            Task { await savedVM.toggleSave(product, userId: uid) }
+                        } label: {
+                            Image(systemName: savedVM.isSaved(product.barcode) ? "heart.fill" : "heart")
+                                .foregroundColor(savedVM.isSaved(product.barcode) ? .imliRed : .imliBlue)
+                                .animation(.spring(duration: 0.25), value: savedVM.isSaved(product.barcode))
+                        }
+                        Button {
+                            // Share action placeholder
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                                .foregroundColor(.imliBlue)
+                        }
                     }
                 }
             }

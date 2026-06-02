@@ -3,6 +3,7 @@ import AVFoundation
 import Combine
 
 // MARK: - Scan View Model
+
 @MainActor
 class ScanViewModel: ObservableObject {
     @Published var scanState: ScanState = .idle
@@ -11,34 +12,29 @@ class ScanViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var torchOn: Bool = false
 
-    enum ScanState {
+    enum ScanState: Equatable {
         case idle, scanning, loading, success, notFound, error
     }
 
-    // Simulate a barcode lookup — replace with real API call
-    func lookupBarcode(_ barcode: String) async {
+    func lookupBarcode(_ barcode: String, userId: String?) async {
         scanState = .loading
         scannedBarcode = barcode
+        errorMessage = nil
 
-        // Simulate network delay
-        try? await Task.sleep(nanoseconds: 1_200_000_000)
+        do {
+            guard let found = try await ProductAPIService.shared.fetchProduct(barcode: barcode) else {
+                scanState = .notFound
+                return
+            }
+            product = found
+            scanState = .success
 
-        // Mock lookup by barcode
-        switch barcode {
-        case "8901063025059":
-            product = .mockBourbonBiscuit
-            scanState = .success
-        case "8901030832109":
-            product = .mockAashirvaadAtta
-            scanState = .success
-        case "8901058005016":
-            product = .mockMaggiChicken
-            scanState = .success
-        default:
-            // Return random mock for demo purposes
-            let mocks: [Product] = [.mockBourbonBiscuit, .mockAashirvaadAtta, .mockMaggiChicken]
-            product = mocks.randomElement()
-            scanState = .success
+            if let userId {
+                try? await FirestoreService.shared.addToHistory(found, userId: userId)
+            }
+        } catch {
+            errorMessage = "Could not reach the product database. Check your connection."
+            scanState = .error
         }
     }
 
@@ -51,29 +47,83 @@ class ScanViewModel: ObservableObject {
 }
 
 // MARK: - History View Model
+
 @MainActor
 class HistoryViewModel: ObservableObject {
-    @Published var history: [Product] = [
-        .mockBourbonBiscuit,
-        .mockAashirvaadAtta,
-        .mockMaggiChicken
-    ]
+    @Published var history: [Product] = []
+    @Published var isLoading = false
 
-    func addScan(_ product: Product) {
-        history.insert(product, at: 0)
+    func loadHistory(userId: String) async {
+        isLoading = true
+        do {
+            history = try await FirestoreService.shared.fetchHistory(userId: userId)
+        } catch {
+            // Leave existing list intact on network error
+        }
+        isLoading = false
+    }
+
+    func delete(productId: String, userId: String) async {
+        do {
+            try await FirestoreService.shared.deleteHistory(productId: productId, userId: userId)
+            history.removeAll { $0.id.uuidString == productId }
+        } catch {}
+    }
+}
+
+// MARK: - Saved View Model
+
+@MainActor
+class SavedViewModel: ObservableObject {
+    @Published var saved: [Product] = []
+    @Published var isLoading = false
+
+    func loadSaved(userId: String) async {
+        isLoading = true
+        do {
+            saved = try await FirestoreService.shared.fetchSaved(userId: userId)
+        } catch {}
+        isLoading = false
+    }
+
+    func toggleSave(_ product: Product, userId: String) async {
+        let isSaved = saved.contains { $0.barcode == product.barcode }
+        if isSaved {
+            saved.removeAll { $0.barcode == product.barcode }
+            try? await FirestoreService.shared.unsaveProduct(barcode: product.barcode, userId: userId)
+        } else {
+            saved.insert(product, at: 0)
+            try? await FirestoreService.shared.saveProduct(product, userId: userId)
+        }
+    }
+
+    func isSaved(_ barcode: String) -> Bool {
+        saved.contains { $0.barcode == barcode }
     }
 }
 
 // MARK: - Profile View Model
+
 @MainActor
 class ProfileViewModel: ObservableObject {
-    @Published var profile: UserProfile = .mock
+    @Published var profile: UserProfile = .empty
 
-    func togglePreference(_ pref: UserProfile.DietPreference) {
+    func loadProfile(userId: String) async {
+        if let fetched = try? await FirestoreService.shared.fetchProfile(userId: userId) {
+            profile = fetched
+        }
+    }
+
+    func saveProfile(userId: String) async {
+        try? await FirestoreService.shared.saveProfile(profile, userId: userId)
+    }
+
+    func togglePreference(_ pref: UserProfile.DietPreference, userId: String) {
         if profile.dietPreferences.contains(pref) {
             profile.dietPreferences.remove(pref)
         } else {
             profile.dietPreferences.insert(pref)
         }
+        Task { await saveProfile(userId: userId) }
     }
 }

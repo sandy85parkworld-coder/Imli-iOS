@@ -1,3 +1,6 @@
+# Firebase config — contains API keys, never commit
+GoogleService-Info.plist
+
 # macOS
 .DS_Store
 

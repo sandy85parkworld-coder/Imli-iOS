@@ -58,7 +58,7 @@ struct ProfileView: View {
                     HStack {
                         Spacer()
                         VStack(spacing: 4) {
-                            Text("Imli — Food Safety Scanner")
+                            Text("Imli · Eat Smart, Live Better")
                                 .font(ImliFont.caption1())
                                 .foregroundColor(.imliSecondary)
                             Text("Version 1.0.0 · Powered by Open Food Facts")

@@ -118,12 +118,27 @@ class ProfileViewModel: ObservableObject {
         try? await FirestoreService.shared.saveProfile(profile, userId: userId)
     }
 
+    func updateName(_ name: String, userId: String) {
+        profile.name = name
+        Task { await saveProfile(userId: userId) }
+    }
+
     func togglePreference(_ pref: UserProfile.DietPreference, userId: String) {
         if profile.dietPreferences.contains(pref) {
             profile.dietPreferences.remove(pref)
         } else {
             profile.dietPreferences.insert(pref)
         }
+        Task { await saveProfile(userId: userId) }
+    }
+
+    func addFamilyMember(_ member: FamilyMember, userId: String) {
+        profile.familyMembers.append(member)
+        Task { await saveProfile(userId: userId) }
+    }
+
+    func deleteFamilyMember(id: UUID, userId: String) {
+        profile.familyMembers.removeAll { $0.id == id }
         Task { await saveProfile(userId: userId) }
     }
 }

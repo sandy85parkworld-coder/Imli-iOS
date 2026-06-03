@@ -103,7 +103,8 @@ struct ScanView: View {
                 onBarcodeFound: { barcode in
                     Task { await viewModel.lookupBarcode(barcode, userId: authService.userId) }
                 },
-                torchOn: $viewModel.torchOn
+                torchOn: $viewModel.torchOn,
+                scanEnabled: viewModel.scanState == .idle
             )
             .ignoresSafeArea()
 
@@ -261,7 +262,7 @@ struct ScanView: View {
             .background(Color.white.opacity(0.12))
             .clipShape(RoundedRectangle(cornerRadius: ImliRadius.lg))
             .padding(.horizontal, 20)
-            .padding(.top, 24)
+            .padding(.top, 72)
             .onAppear { searchFocused = true }
 
             // Results
@@ -327,7 +328,7 @@ struct ScanView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 32))
                 .foregroundColor(.white.opacity(0.2))
-            Text("No products found for "\(searchQuery)"")
+            Text("No products found for \"\(searchQuery)\"")
                 .font(ImliFont.footnote())
                 .foregroundColor(.white.opacity(0.4))
                 .multilineTextAlignment(.center)
@@ -349,7 +350,6 @@ struct ScanView: View {
             }
             isSearching = false
         }
-    }
     }
 
     // MARK: - Bottom Controls

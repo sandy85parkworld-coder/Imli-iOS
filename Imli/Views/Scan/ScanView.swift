@@ -7,6 +7,9 @@ struct ScanView: View {
     @State private var selectedMode: ScanMode = .barcode
     @State private var showingResult = false
     @State private var cameraPermission: CameraPermission = .unknown
+    // Label OCR state
+    @State private var capturedLabelText = ""
+    @State private var showLabelResult = false
     // Search state
     @State private var searchQuery = ""
     @State private var searchResults: [ProductSearchResult] = []
@@ -34,7 +37,11 @@ struct ScanView: View {
                 case .barcode:
                     barcodeScannerLayer
                 case .label:
-                    placeholderCameraLayer(icon: "camera.viewfinder", text: "Snap the ingredients label")
+                    LabelScannerContainer { text in
+                        capturedLabelText = text
+                        showLabelResult = true
+                    }
+                    .ignoresSafeArea()
                 case .search:
                     searchLayer
                 }
@@ -47,6 +54,9 @@ struct ScanView: View {
                 }
             }
             .navigationBarHidden(true)
+            .sheet(isPresented: $showLabelResult) {
+                LabelResultView(rawText: capturedLabelText)
+            }
             .sheet(isPresented: $showingResult) {
                 if let product = viewModel.product {
                     ResultView(product: product)

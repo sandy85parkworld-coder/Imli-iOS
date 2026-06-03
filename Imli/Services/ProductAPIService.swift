@@ -121,6 +121,21 @@ final class ProductAPIService {
         }
     }
 
+    // MARK: - Label OCR analysis (used when no barcode is available)
+
+    struct LabelAnalysis {
+        let flags: [IngredientFlag]
+        let vegStatus: VegStatus
+        let ingredients: String
+    }
+
+    func analyzeIngredients(_ rawText: String) -> LabelAnalysis {
+        let cleaned = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let flags    = extractFlags(nutrition: .zero, ingredients: cleaned)
+        let vegStatus = detectVegStatus(cleaned)
+        return LabelAnalysis(flags: flags, vegStatus: vegStatus, ingredients: cleaned)
+    }
+
     func fetchProduct(barcode: String) async throws -> Product? {
         guard let url = URL(string: "\(baseURL)/\(barcode)") else { return nil }
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)

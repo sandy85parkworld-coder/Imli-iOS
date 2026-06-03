@@ -380,6 +380,15 @@ struct UserProfile: Codable {
     }
 }
 
+extension NutritionInfo {
+    static let zero = NutritionInfo(
+        energy: 0, protein: 0, carbs: 0,
+        totalSugars: 0, addedSugars: nil,
+        totalFat: 0, saturatedFat: 0, transFat: 0,
+        sodium: 0, fiber: nil, servingSize: "100g"
+    )
+}
+
 // MARK: - Mock Data
 extension Product {
     static let mockBourbonBiscuit = Product(
